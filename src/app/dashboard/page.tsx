@@ -5,6 +5,13 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import Link from 'next/link';
+import { PageHeader } from '@/components/layout/page-header';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { LoadingPage } from '@/components/ui/loading';
+import { ProtectedRoute } from '@/components/auth/protected-route';
 
 export default function Dashboard() {
   const [user] = useAuthState(auth);
@@ -32,41 +39,143 @@ export default function Dashboard() {
   }, [user]);
 
   if (loading) {
-    return <p>Loading...</p>;
+    return <LoadingPage message="Loading your expenses..." />;
   }
 
+  const getStatusVariant = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return 'success';
+      case 'pending':
+        return 'warning';
+      case 'rejected':
+        return 'destructive';
+      default:
+        return 'secondary';
+    }
+  };
+
+  const totalAmount = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+  const pendingCount = expenses.filter(expense => expense.status === 'Pending').length;
+  const approvedCount = expenses.filter(expense => expense.status === 'Approved').length;
+  const rejectedCount = expenses.filter(expense => expense.status === 'Rejected').length;
+
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">My Expenses</h1>
-        <Link href="/expenses/new" className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md shadow-sm">
-          New Expense
-        </Link>
+    <ProtectedRoute>
+      <div className="min-h-screen bg-background">
+        <PageHeader
+          title="My Expenses"
+          description="Track and manage your expense reports"
+        >
+          <Button asChild>
+            <Link href="/expenses/new">New Expense</Link>
+          </Button>
+        </PageHeader>
+
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Amount</CardTitle>
+              <span className="text-2xl">💰</span>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${totalAmount.toFixed(2)}</div>
+              <p className="text-xs text-muted-foreground">All time</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending</CardTitle>
+              <span className="text-2xl">⏳</span>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{pendingCount}</div>
+              <p className="text-xs text-muted-foreground">Awaiting approval</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Approved</CardTitle>
+              <span className="text-2xl">✅</span>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{approvedCount}</div>
+              <p className="text-xs text-muted-foreground">Successfully approved</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Rejected</CardTitle>
+              <span className="text-2xl">❌</span>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{rejectedCount}</div>
+              <p className="text-xs text-muted-foreground">Need attention</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Expenses Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Expense Reports</CardTitle>
+            <CardDescription>
+              A list of all your submitted expense reports
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {expenses.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-4">📊</div>
+                <h3 className="text-lg font-medium text-muted-foreground mb-2">No expenses yet</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Get started by submitting your first expense report
+                </p>
+                <Button asChild>
+                  <Link href="/expenses/new">Create Expense</Link>
+                </Button>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {expenses.map((expense) => (
+                    <TableRow key={expense.id}>
+                      <TableCell className="font-medium">
+                        {new Date(expense.expense_date.seconds * 1000).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>{expense.description}</TableCell>
+                      <TableCell>{expense.category}</TableCell>
+                      <TableCell>
+                        {expense.currency} {expense.amount}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusVariant(expense.status)}>
+                          {expense.status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+        </main>
       </div>
-      <div className="bg-white rounded-lg shadow-md">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {expenses.map(expense => (
-              <tr key={expense.id}>
-                <td className="px-6 py-4 whitespace-nowrap">{new Date(expense.expense_date.seconds * 1000).toLocaleDateString()}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{expense.description}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{expense.category}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{expense.amount} {expense.currency}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{expense.status}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    </ProtectedRoute>
   );
 }

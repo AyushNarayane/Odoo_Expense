@@ -6,6 +6,12 @@ import { collection, addDoc, serverTimestamp, getDocs, query, where, doc, getDoc
 import { db, auth } from '@/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { createWorker } from 'tesseract.js';
+import { PageHeader } from '@/components/layout/page-header';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { LoadingPage } from '@/components/ui/loading';
+import { ProtectedRoute } from '@/components/auth/protected-route';
 
 export default function NewExpense() {
   const [user] = useAuthState(auth);
@@ -19,34 +25,44 @@ export default function NewExpense() {
   const [selectedFlow, setSelectedFlow] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
 
   const handleReceiptUpload = async (file: File) => {
     setReceipt(file);
     setOcrLoading(true);
-    const worker = await createWorker('eng');
-    const ret = await worker.recognize(file);
-    const text = ret.data.text;
-    
-    // Basic parsing logic (can be improved)
-    const amountMatch = text.match(/(\d+\.\d{2})/);
-    if (amountMatch) setAmount(amountMatch[0]);
+    try {
+      const worker = await createWorker('eng');
+      const ret = await worker.recognize(file);
+      const text = ret.data.text;
+      
+      // Basic parsing logic (can be improved)
+      const amountMatch = text.match(/(\d+\.\d{2})/);
+      if (amountMatch) setAmount(amountMatch[0]);
 
-    const dateMatch = text.match(/(\d{2}\/\d{2}\/\d{4})/);
-    if (dateMatch) setExpenseDate(dateMatch[0]);
+      const dateMatch = text.match(/(\d{2}\/\d{2}\/\d{4})/);
+      if (dateMatch) setExpenseDate(dateMatch[0]);
 
-    // For description, we can take a snippet of the text
-    setDescription(text.substring(0, 100));
+      // For description, we can take a snippet of the text
+      setDescription(text.substring(0, 100));
 
-    await worker.terminate();
-    setOcrLoading(false);
+      await worker.terminate();
+    } catch (error) {
+      console.error('OCR processing failed:', error);
+    } finally {
+      setOcrLoading(false);
+    }
   };
 
   useEffect(() => {
     const fetchFlows = async () => {
-      const flowsCollection = collection(db, 'approval_flows');
-      const flowsSnapshot = await getDocs(flowsCollection);
-      setFlows(flowsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      try {
+        const flowsCollection = collection(db, 'approval_flows');
+        const flowsSnapshot = await getDocs(flowsCollection);
+        setFlows(flowsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (error) {
+        console.error('Failed to fetch flows:', error);
+      }
     };
     fetchFlows();
   }, []);
@@ -54,9 +70,11 @@ export default function NewExpense() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSubmitting(true);
 
     if (!user) {
       setError('You must be logged in to submit an expense.');
+      setSubmitting(false);
       return;
     }
 
@@ -106,107 +124,172 @@ export default function NewExpense() {
         }
       }
 
-      router.push('/');
+      router.push('/dashboard');
     } catch (error: any) {
       setError(error.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  if (!user) {
+    return <LoadingPage message="Loading..." />;
+  }
+
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-6">Submit New Expense</h1>
-      <form onSubmit={handleSubmit} className="max-w-xl mx-auto bg-white p-8 rounded-lg shadow-md">
-        <div className="space-y-6">
-          <div>
-            <label htmlFor="amount" className="text-sm font-medium text-gray-700">Amount</label>
-            <input
-              id="amount"
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm"
-            />
-          </div>
-          <div>
-            <label htmlFor="currency" className="text-sm font-medium text-gray-700">Currency</label>
-            <input
-              id="currency"
-              type="text"
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              required
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm"
-            />
-          </div>
-          <div>
-            <label htmlFor="category" className="text-sm font-medium text-gray-700">Category</label>
-            <input
-              id="category"
-              type="text"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              required
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm"
-            />
-          </div>
-          <div>
-            <label htmlFor="flow" className="text-sm font-medium text-gray-700">Approval Flow</label>
-            <select
-              id="flow"
-              value={selectedFlow}
-              onChange={(e) => setSelectedFlow(e.target.value)}
-              required
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm"
-            >
-              <option value="">Select a flow</option>
-              {flows.map(flow => (
-                <option key={flow.id} value={flow.id}>{flow.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="description" className="text-sm font-medium text-gray-700">Description</label>
-            <textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              required
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm"
-            />
-          </div>
-          <div>
-            <label htmlFor="expenseDate" className="text-sm font-medium text-gray-700">Date of Expense</label>
-            <input
-              id="expenseDate"
-              type="date"
-              value={expenseDate}
-              onChange={(e) => setExpenseDate(e.target.value)}
-              required
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm"
-            />
-          </div>
-          <div>
-            <label htmlFor="receipt" className="text-sm font-medium text-gray-700">Receipt</label>
-            <input
-              id="receipt"
-              type="file"
-              onChange={(e) => e.target.files && handleReceiptUpload(e.target.files[0])}
-              className="w-full px-3 py-2 mt-1"
-            />
-            {ocrLoading && <p>Scanning receipt...</p>}
-          </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div>
-            <button
-              type="submit"
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md shadow-sm"
-            >
-              Submit Expense
-            </button>
-          </div>
-        </div>
-      </form>
-    </div>
+    <ProtectedRoute>
+      <div className="min-h-screen bg-background">
+        <PageHeader
+          title="Submit New Expense"
+          description="Create and submit a new expense report for approval"
+        />
+
+        <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Expense Details</CardTitle>
+            <CardDescription>
+              Fill in the details of your expense. All fields are required.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input
+                  id="amount"
+                  type="number"
+                  label="Amount"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  required
+                />
+                
+                <div className="space-y-2">
+                  <label htmlFor="currency" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Currency
+                  </label>
+                  <select
+                    id="currency"
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    required
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                    <option value="CAD">CAD</option>
+                    <option value="AUD">AUD</option>
+                  </select>
+                </div>
+              </div>
+
+              <Input
+                id="category"
+                type="text"
+                label="Category"
+                placeholder="e.g., Travel, Meals, Office Supplies"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                required
+              />
+
+              <div className="space-y-2">
+                <label htmlFor="description" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Description
+                </label>
+                <textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  required
+                  rows={3}
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="Describe the purpose of this expense..."
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input
+                  id="expenseDate"
+                  type="date"
+                  label="Date of Expense"
+                  value={expenseDate}
+                  onChange={(e) => setExpenseDate(e.target.value)}
+                  required
+                />
+
+                <div className="space-y-2">
+                  <label htmlFor="flow" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Approval Flow
+                  </label>
+                  <select
+                    id="flow"
+                    value={selectedFlow}
+                    onChange={(e) => setSelectedFlow(e.target.value)}
+                    required
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="">Select a flow</option>
+                    {flows.map(flow => (
+                      <option key={flow.id} value={flow.id}>{flow.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="receipt" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Receipt (Optional)
+                </label>
+                <input
+                  id="receipt"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => e.target.files && handleReceiptUpload(e.target.files[0])}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+                {ocrLoading && (
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                    <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                    <span>Scanning receipt...</span>
+                  </div>
+                )}
+                {receipt && !ocrLoading && (
+                  <p className="text-sm text-success">Receipt uploaded successfully</p>
+                )}
+              </div>
+
+              {error && (
+                <div className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex space-x-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.back()}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1"
+                  loading={submitting}
+                  disabled={submitting}
+                >
+                  {submitting ? 'Submitting...' : 'Submit Expense'}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+        </main>
+      </div>
+    </ProtectedRoute>
   );
 }

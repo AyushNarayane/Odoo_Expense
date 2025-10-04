@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
 import { auth, db } from '@/firebase';
+import Link from 'next/link';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 export default function SignUp() {
   const [name, setName] = useState('');
@@ -13,6 +17,7 @@ export default function SignUp() {
   const [country, setCountry] = useState('');
   const [countries, setCountries] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -32,6 +37,7 @@ export default function SignUp() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setLoading(true);
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -71,91 +77,117 @@ export default function SignUp() {
       router.push('/');
     } catch (error: any) {
       setError(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold text-center text-gray-900">Create an account</h2>
-        <form className="space-y-6" onSubmit={handleSignUp}>
-          <div>
-            <label htmlFor="name" className="text-sm font-medium text-gray-700">
-              Name
-            </label>
-            <input
-              id="name"
-              name="name"
-              type="text"
-              required
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center">
+          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-primary/10">
+            <span className="text-2xl">💰</span>
           </div>
-          <div>
-            <label htmlFor="email" className="text-sm font-medium text-gray-700">
-              Email address
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="password"
-              className="text-sm font-medium text-gray-700"
-            >
-              Password
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="country" className="text-sm font-medium text-gray-700">
-              Country
-            </label>
-            <select
-              id="country"
-              name="country"
-              required
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-            >
-              <option value="" disabled>Select your country</option>
-              {countries.sort((a, b) => a.name.common.localeCompare(b.name.common)).map((c) => (
-                <option key={c.name.common} value={c.name.common}>
-                  {c.name.common}
-                </option>
-              ))}
-            </select>
-          </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div>
-            <button
-              type="submit"
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              Sign up
-            </button>
-          </div>
-        </form>
+          <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
+            Create your account
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Get started with expense tracking today
+          </p>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Sign up</CardTitle>
+            <CardDescription>
+              Fill in your details to create your account
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-4" onSubmit={handleSignUp}>
+              <Input
+                id="name"
+                name="name"
+                type="text"
+                label="Full name"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+              
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                label="Email address"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                label="Password"
+                autoComplete="new-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+
+              <div className="space-y-2">
+                <label htmlFor="country" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Country
+                </label>
+                <select
+                  id="country"
+                  name="country"
+                  required
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                >
+                  <option value="" disabled>Select your country</option>
+                  {countries.sort((a, b) => a.name.common.localeCompare(b.name.common)).map((c) => (
+                    <option key={c.name.common} value={c.name.common}>
+                      {c.name.common}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {error && (
+                <div className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md">
+                  {error}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full"
+                loading={loading}
+                disabled={loading}
+              >
+                {loading ? 'Creating account...' : 'Create account'}
+              </Button>
+            </form>
+
+            <div className="mt-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                Already have an account?{' '}
+                <Link 
+                  href="/login" 
+                  className="font-medium text-primary hover:text-primary/80 transition-colors"
+                >
+                  Sign in
+                </Link>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

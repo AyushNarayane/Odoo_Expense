@@ -4,11 +4,19 @@ import { useEffect, useState } from 'react';
 import { collection, getDocs, query, where, doc, updateDoc, getDoc, addDoc } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
+import { PageHeader } from '@/components/layout/page-header';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { LoadingPage } from '@/components/ui/loading';
+import { ProtectedRoute } from '@/components/auth/protected-route';
 
 export default function ManagerDashboard() {
   const [user] = useAuthState(auth);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState<string | null>(null);
 
   const fetchPendingExpenses = async () => {
     if (!user) return;
@@ -59,6 +67,7 @@ export default function ManagerDashboard() {
   }, [user]);
 
   const handleApproval = async (expenseId: string, newStatus: 'Approved' | 'Rejected') => {
+    setProcessing(expenseId);
     try {
       const expenseDocRef = doc(db, 'expenses', expenseId);
       const expenseDoc = await getDoc(expenseDocRef);
@@ -137,53 +146,141 @@ export default function ManagerDashboard() {
       fetchPendingExpenses(); // Refresh the list
     } catch (error) {
       console.error('Failed to update expense status:', error);
+    } finally {
+      setProcessing(null);
     }
   };
 
   if (loading) {
-    return <p>Loading...</p>;
+    return <LoadingPage message="Loading pending approvals..." />;
   }
 
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-6">Manager Dashboard: Pending Approvals</h1>
-      <div className="bg-white rounded-lg shadow-md">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {expenses.map(expense => (
-              <tr key={expense.id}>
-                <td className="px-6 py-4 whitespace-nowrap">{expense.employee_name || '...'}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{new Date(expense.expense_date.seconds * 1000).toLocaleDateString()}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{expense.description}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{expense.amount} {expense.currency}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <button
+    <ProtectedRoute requiredRole="Manager">
+      <div className="min-h-screen bg-background">
+        <PageHeader
+          title="Manager Dashboard"
+          description="Review and approve pending expense reports"
+        />
+
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending Reviews</CardTitle>
+              <span className="text-2xl">⏳</span>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{expenses.length}</div>
+              <p className="text-xs text-muted-foreground">Awaiting your approval</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Amount</CardTitle>
+              <span className="text-2xl">💰</span>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                ${expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0).toFixed(2)}
+              </div>
+              <p className="text-xs text-muted-foreground">Pending approval</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Unique Employees</CardTitle>
+              <span className="text-2xl">👥</span>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {new Set(expenses.map(expense => expense.employee_id)).size}
+              </div>
+              <p className="text-xs text-muted-foreground">Different employees</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Expenses Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Pending Approvals</CardTitle>
+            <CardDescription>
+              Review and approve expense reports from your team members
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {expenses.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-4">✅</div>
+                <h3 className="text-lg font-medium text-muted-foreground mb-2">All caught up!</h3>
+                <p className="text-sm text-muted-foreground">
+                  No pending expense approvals at the moment
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {expenses.map((expense) => (
+                    <TableRow key={expense.id}>
+                      <TableCell className="font-medium">
+                        {expense.employee_name || 'Unknown'}
+                      </TableCell>
+                      <TableCell>
+                        {new Date(expense.expense_date.seconds * 1000).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        {expense.description}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{expense.category}</Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {expense.currency} {expense.amount}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button
+                            size="sm"
+                            variant="default"
                     onClick={() => handleApproval(expense.id, 'Approved')}
-                    className="px-3 py-1 text-sm text-white bg-green-600 rounded-md mr-2"
-                  >
-                    Approve
-                  </button>
-                  <button
+                            disabled={processing === expense.id}
+                            className="bg-success hover:bg-success/90"
+                          >
+                            {processing === expense.id ? 'Processing...' : 'Approve'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
                     onClick={() => handleApproval(expense.id, 'Rejected')}
-                    className="px-3 py-1 text-sm text-white bg-red-600 rounded-md"
-                  >
-                    Reject
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                            disabled={processing === expense.id}
+                          >
+                            {processing === expense.id ? 'Processing...' : 'Reject'}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+        </main>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 }
