@@ -24,7 +24,7 @@ export default function NewExpense() {
   const [flows, setFlows] = useState<any[]>([]);
   const [selectedFlow, setSelectedFlow] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [ocrLoading, setOcrLoading] = useState(false);
+  const [npmLoading, setOcrLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
 

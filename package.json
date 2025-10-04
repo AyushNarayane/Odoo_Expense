@@ -10,6 +10,7 @@
     "seed": "node scripts/seed.js"
   },
   "dependencies": {
+    "@radix-ui/react-slot": "^1.2.3",
     "clsx": "^2.1.1",
     "firebase": "^12.3.0",
     "firebase-admin": "^13.5.0",
