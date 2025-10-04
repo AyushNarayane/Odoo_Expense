@@ -33,18 +33,54 @@ export default function NewExpense() {
     setOcrLoading(true);
     try {
       const worker = await createWorker('eng');
-      const ret = await worker.recognize(file);
-      const text = ret.data.text;
+      const { data: { text } } = await worker.recognize(file);
+
+      // Improved parsing logic
+      const lines = text.split('\n');
       
-      // Basic parsing logic (can be improved)
-      const amountMatch = text.match(/(\d+\.\d{2})/);
-      if (amountMatch) setAmount(amountMatch[0]);
+      // Find amount (look for "Total" or take the largest number)
+      let extractedAmount = '';
+      const amountRegex = /\$?(\d{1,3}(?:,?\d{3})*\.\d{2})/;
+      const totalLine = lines.find(line => /total/i.test(line));
+      if (totalLine) {
+        const amountMatch = totalLine.match(amountRegex);
+        if (amountMatch) extractedAmount = amountMatch[1].replace(',', '');
+      }
+      
+      if (!extractedAmount) {
+        const numbers = text.match(/\$?(\d{1,3}(?:,?\d{3})*\.\d{2})/g) || [];
+        if (numbers.length > 0) {
+          const largestNumber = numbers
+            .map(n => parseFloat(n.replace(/[$,]/g, '')))
+            .sort((a, b) => b - a)[0];
+          if (largestNumber) {
+            extractedAmount = largestNumber.toFixed(2);
+          }
+        }
+      }
+      if (extractedAmount) setAmount(extractedAmount);
 
-      const dateMatch = text.match(/(\d{2}\/\d{2}\/\d{4})/);
-      if (dateMatch) setExpenseDate(dateMatch[0]);
+      // Find date and format it to YYYY-MM-DD
+      const dateRegex = /(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})|(\d{4}[-]\d{1,2}[-]\d{1,2})|(\w+\s\d{1,2},?\s\d{4})/;
+      const dateMatch = text.match(dateRegex);
+      if (dateMatch) {
+        const parsedDate = new Date(dateMatch[0]);
+        if (!isNaN(parsedDate.getTime())) {
+          // Format to YYYY-MM-DD for the input type="date"
+          const year = parsedDate.getFullYear();
+          const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+          const day = String(parsedDate.getDate()).padStart(2, '0');
+          setExpenseDate(`${year}-${month}-${day}`);
+        }
+      }
 
-      // For description, we can take a snippet of the text
-      setDescription(text.substring(0, 100));
+      // For description, use the first non-empty line as a heuristic for merchant name
+      const firstLine = lines.find(line => line.trim().length > 0);
+      if (firstLine) {
+        setDescription(firstLine.substring(0, 100));
+      } else {
+        setDescription(text.substring(0, 100));
+      }
 
       await worker.terminate();
     } catch (error) {
