@@ -34,12 +34,14 @@ export default function Home() {
         } catch (error) {
           console.error('Failed to fetch user role:', error);
         }
+        setLoading(false);
+      } else {
+        router.push('/login');
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [router]);
 
   const handleSignOut = async () => {
     try {
@@ -51,7 +53,7 @@ export default function Home() {
     }
   };
 
-  if (loading) {
+  if (loading || !user) {
     return <LoadingPage message="Loading..." />;
   }
 
@@ -143,65 +145,7 @@ export default function Home() {
             </div>
           </>
         ) : (
-          // Show landing page for non-authenticated users
-          <>
-            <div className="text-center">
-              <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-6xl">
-                Expense Management
-                <span className="text-primary"> Made Simple</span>
-              </h1>
-              <p className="mt-6 text-lg leading-8 text-muted-foreground max-w-2xl mx-auto">
-                Streamline your expense tracking and approval workflows with our modern, 
-                role-based expense management platform.
-              </p>
-              <div className="mt-10 flex items-center justify-center gap-x-6">
-                <Button size="lg" asChild>
-                  <Link href="/signup">Get Started</Link>
-                </Button>
-                <Button variant="outline" size="lg" asChild>
-                  <Link href="/login">Sign In</Link>
-                </Button>
-              </div>
-            </div>
-            
-            <div className="mt-16 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-              <Card>
-                <CardHeader>
-                  <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center text-white text-xl mb-4">
-                    📊
-                  </div>
-                  <CardTitle>Track Expenses</CardTitle>
-                  <CardDescription>
-                    Easily submit and track your business expenses with detailed categorization.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center text-white text-xl mb-4">
-                    ✅
-                  </div>
-                  <CardTitle>Approval Workflows</CardTitle>
-                  <CardDescription>
-                    Streamlined approval processes with role-based permissions and notifications.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center text-white text-xl mb-4">
-                    📱
-                  </div>
-                  <CardTitle>Mobile Friendly</CardTitle>
-                  <CardDescription>
-                    Access your expense data anywhere with our responsive design.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            </div>
-          </>
+          null
         )}
       </main>
     </div>
